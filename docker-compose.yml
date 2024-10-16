@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres  # Use the official PostgreSQL image
+    networks:
+      - dbnet
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      CKAN_DB_USER: ${CKAN_DB_USER}
+      CKAN_DB_PASSWORD: ${CKAN_DB_PASSWORD}
+      CKAN_DB: ${CKAN_DB}
+      DATASTORE_READONLY_USER: ${DATASTORE_READONLY_USER}
+      DATASTORE_READONLY_PASSWORD: ${DATASTORE_READONLY_PASSWORD}
+      DATASTORE_DB: ${DATASTORE_DB}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+
+  solr:
+    image: ckan/ckan-solr:2.10-solr9
+    networks:
+      - solrnet
+    volumes:
+      - solr_data:/var/solr
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:8983/solr/"]
+
+  redis:
+    image: redis:7.0
+    networks:
+      - redisnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+
+  ckan:  # Correctly defining the CKAN service
+    image: ckan/ckan-solr:2.10-solr9  # Maintain the specified CKAN image
+    depends_on:
+      - db
+      - solr
+      - redis
+    environment:
+      CKAN_SITE_URL: http://localhost:5000  # Specify the CKAN site URL
+      CKAN_DB_USER: ${CKAN_DB_USER}
+      CKAN_DB_PASSWORD: ${CKAN_DB_PASSWORD}
+      CKAN_DB: ${CKAN_DB}
+    ports:
+      - "5000:5000"  # Map CKAN's port to host (as a list)
+
+networks:
+  dbnet:
+  solrnet:
+  redisnet:
+
+volumes:
+  pg_data:
+  solr_data:
+
