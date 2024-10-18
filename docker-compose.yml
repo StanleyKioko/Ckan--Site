@@ -1,62 +1,87 @@
 services:
   db:
-    image: postgres  # Use the official PostgreSQL image
-    networks:
-      - dbnet
+    image: postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      CKAN_DB_USER: ${CKAN_DB_USER}
-      CKAN_DB_PASSWORD: ${CKAN_DB_PASSWORD}
-      CKAN_DB: ${CKAN_DB}
-      DATASTORE_READONLY_USER: ${DATASTORE_READONLY_USER}
-      DATASTORE_READONLY_PASSWORD: ${DATASTORE_READONLY_PASSWORD}
-      DATASTORE_DB: ${DATASTORE_DB}
     volumes:
       - pg_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - common
+    ports:
+      - "5432:5432"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   solr:
-    image: ckan/ckan-solr:2.10-solr9
+    image: solr:9.0
+    environment:
+      CKAN_SOLR_URL: ${CKAN_SOLR_URL}
     networks:
-      - solrnet
+      - common
     volumes:
       - solr_data:/var/solr
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:8983/solr/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8983/solr/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      - db
 
   redis:
-    image: redis:7.0
+    image: redis:${REDIS_VERSION}
     networks:
-      - redisnet
+      - common
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "PING"]
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
-  ckan:  # Correctly defining the CKAN service
-    image: ckan/ckan-solr:2.10-solr9  # Maintain the specified CKAN image
+  ckan:
+    image: solr:9.0
+    environment:
+      CKAN_SITE_URL: ${CKAN_SITE_URL}
+      CKAN_SQLALCHEMY_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}  # Updated URL
+      CKAN_SOLR_URL: ${CKAN_SOLR_URL}
+      CKAN_REDIS_URL: ${CKAN_REDIS_URL}
+    networks:
+      - common
     depends_on:
       - db
       - solr
       - redis
-    environment:
-      CKAN_SITE_URL: http://localhost:5000  # Specify the CKAN site URL
-      CKAN_DB_USER: ${CKAN_DB_USER}
-      CKAN_DB_PASSWORD: ${CKAN_DB_PASSWORD}
-      CKAN_DB: ${CKAN_DB}
+    volumes:
+      - ckan_storage:/var/lib/ckan
     ports:
-      - "5000:5000"  # Map CKAN's port to host (as a list)
+      - "5000:5000"
+    restart: unless-stopped
+
+  data-pusher:
+    image: solr:9.0
+    restart: always
+    environment:
+      CKAN_SITE_URL: ${CKAN_SITE_URL}
+      CKAN_SQLALCHEMY_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}
+    depends_on:
+      - db
+      - redis
 
 networks:
-  dbnet:
-  solrnet:
-  redisnet:
+  common:
+    driver: bridge
 
 volumes:
   pg_data:
   solr_data:
+  ckan_storage:
 
