@@ -96,4 +96,3 @@ volumes:
   pg_data:
   solr_data:
   ckan_storage:
-
