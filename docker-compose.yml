@@ -27,10 +27,12 @@ services:
       - common
     volumes:
       - solr_data:/var/solr
+    ports:
+      - "8983:8983"  # Exposing Solr on port 8983
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8983/solr/"]
-      interval: 30s
+      interval: 120s  # Increased interval to give Solr more time
       timeout: 10s
       retries: 5
     depends_on:
@@ -48,7 +50,7 @@ services:
       retries: 5
 
   ckan:
-    image: solr:9.0
+    image: keitaro/ckan:${CKAN_VERSION}
     environment:
       CKAN_SITE_URL: ${CKAN_SITE_URL}
       CKAN_SQLALCHEMY_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}  # Updated URL
@@ -57,9 +59,12 @@ services:
     networks:
       - common
     depends_on:
-      - db
-      - solr
-      - redis
+      db:
+        condition: service_healthy  # Wait for DB to be healthy
+      solr:
+        condition: service_healthy  # Wait for Solr to be healthy
+      redis:
+        condition: service_healthy  # Wait for Redis to be healthy
     volumes:
       - ckan_storage:/var/lib/ckan
     ports:
@@ -67,14 +72,21 @@ services:
     restart: unless-stopped
 
   data-pusher:
-    image: solr:9.0
+    image: keitaro/ckan-datapusher:${DATAPUSHER_VERSION}
     restart: always
     environment:
       CKAN_SITE_URL: ${CKAN_SITE_URL}
       CKAN_SQLALCHEMY_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB}
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy  # Wait for DB to be healthy
+      redis:
+        condition: service_healthy  # Wait for Redis to be healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]  # Adjust health check to check for Datapusher
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
 networks:
   common:
