@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<schema name="ckan" version="1.6">
+  <fields>
+    <field name="id" type="string" indexed="true" stored="true" required="true" />
+    <field name="title" type="text_general" indexed="true" stored="true" />
+    <field name="author" type="string" indexed="true" stored="true" />
+    <field name="notes" type="text_general" indexed="true" stored="true" />
+    <field name="tags" type="string" indexed="true" stored="true" multiValued="true" />
+    <field name="extras" type="text_general" indexed="true" stored="true" />
+    <field name="url" type="string" indexed="true" stored="true" />
+    <field name="created" type="tdate" indexed="true" stored="true" />
+    <field name="updated" type="tdate" indexed="true" stored="true" />
+  </fields>
+
+  <uniqueKey>id</uniqueKey>
+  
+  <copyField source="title" dest="text" />
+  <copyField source="notes" dest="text" />
+  <copyField source="tags" dest="text" />
+  
+  <types>
+    <fieldType name="string" class="solr.StrField" sortMissingLast="true"/>
+    <fieldType name="text_general" class="solr.TextField">
+      <analyzer type="index">
+        <tokenizer class="solr.StandardTokenizerFactory"/>
+        <filter class="solr.LowerCaseFilterFactory"/>
+      </analyzer>
+      <analyzer type="query">
+        <tokenizer class="solr.StandardTokenizerFactory"/>
+        <filter class="solr.LowerCaseFilterFactory"/>
+      </analyzer>
+    </fieldType>
+    <fieldType name="tdate" class="solr.TrieDateField" precisionStep="0" positionIncrementGap="12"/>
+  </types>
+  
+  <defaultSearchField>text</defaultSearchField>
+  <highlighting>
+    <field name="title" />
+    <field name="notes" />
+    <field name="tags" />
+  </highlighting>
+</schema>
+
